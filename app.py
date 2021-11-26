@@ -58,6 +58,17 @@ def insert_user(user):
             """), user).lastrowid
 
 
+def insert_tweet(user_tweet):
+    return current_app.database.execute(text("""
+        INSERT INTO tweets (
+            user_id,
+            tweet
+        ) VALUES (
+            :id,
+            :tweet
+        )
+    """), user_tweet).rowcount
+
 def create_app():
     app = Flask(__name__)
     app.debug = True
@@ -85,21 +96,14 @@ def create_app():
 
     @app.route("/tweet", methods=['POST'])
     def tweet():
-        payload = request.json
-        user_id = int(payload['id'])
-        tweet = payload['tweet']
-
-        if user_id not in app.users:
-            return '사용자가 존재하지 않습니다', 400
+        user_tweet = request.json
+        tweet = user_tweet['tweet']
 
         if len(tweet) > 300:
-            return '300자를 초과한 tweet', 400
+            return '300자 초과', 400
+        else:
+            insert_tweet(user_tweet)
 
-        tweet_dict = {
-            'user_id': user_id,
-            'tweet': tweet
-        }
-        app.tweets.append(tweet_dict)
         return 'tweet success', 200
 
     @app.route("/follow", methods=['POST'])
