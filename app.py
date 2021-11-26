@@ -12,6 +12,12 @@ db = {
     'database': db_database
 }
 
+'''
+이 코드는 그냥 쓰면 에러를 발생시킨다.
+set 모듈이 JSON 으로 변경될 수 없기 때문. 
+이를 해결하기 위해 custom json encoder를 구현해야 한다. -> 위에 CustomJSONEncoder class 참고
+'''
+
 
 class CustomJSONEncoder(JSONEncoder):
     def default(self, obj):
@@ -69,6 +75,39 @@ def insert_tweet(user_tweet):
         )
     """), user_tweet).rowcount
 
+
+def insert_follow(user_follow):
+    current_app.database.execute(text("""
+    INSERT INTO users_follow_list (user_id, follow_user_id) VALUES (:id, :follow)
+    """), user_follow)
+
+
+def insert_unfollow(user_unfollow):
+    current_app.database.execute(text("""
+        DELETE FROM users_follow_list
+        WHERE user_id = :id 
+        AND follow_user_id = :unfollow
+    """), user_unfollow).rowcount
+
+
+def get_timeline(user_id):
+    timeline = current_app.database.execute(text("""
+        SELECT
+            t.user_id,
+            t.tweet
+        FROM tweets t
+        LEFT JOIN users_follow_list ufl ON ufl.user_id = :user_id
+        WHERE t.user_id = :user_id
+        OR t.user_id = ufl.follow_user_id
+    """),{
+        'user_id': user_id
+    }).fetchall()
+
+    return [{
+        'user_id': tweet['user_id'],
+        'tweet': tweet['tweet']
+    } for tweet in timeline]
+
 def create_app():
     app = Flask(__name__)
     app.debug = True
@@ -85,14 +124,10 @@ def create_app():
 
     @app.route("/sign-up", methods=['POST', 'GET'])
     def sign_up():
-        print("dasfadsf")
-        if request.method == 'GET':
-            return "pdsfasd"
-        else:
-            new_user = request.json
-            new_user_id = insert_user(new_user)
-            new_user = get_user(new_user_id)
-            return jsonify(new_user)
+        new_user = request.json
+        new_user_id = insert_user(new_user)
+        new_user = get_user(new_user_id)
+        return jsonify(new_user)
 
     @app.route("/tweet", methods=['POST'])
     def tweet():
@@ -109,48 +144,21 @@ def create_app():
     @app.route("/follow", methods=['POST'])
     def follow():
         payload = request.json
-        user_id = int(payload['id'])
-        user_id_to_follow = int(payload['follow'])
-
-        if any([id_ not in app.users for id_ in [user_id, user_id_to_follow]]):
-            return '사용자가 존재하지 않습니다.', 400
-
-        user = app.users[user_id]
-        user.setdefault('follow', set()).add(user_id_to_follow)
-
-        '''
-        이 코드는 그냥 쓰면 에러를 발생시킨다.
-        set 모듈이 JSON 으로 변경될 수 없기 때문. 
-        이를 해결하기 위해 custom json encoder를 구현해야 한다. -> 위에 CustomJSONEncoder class 참고
-        '''
-        return jsonify(user)
+        insert_follow(payload)
+        return 'follow success', 200
 
     @app.route("/unfollow", methods=['POST'])
     def unfollow():
         payload = request.json
-        user_id = int(payload['id'])
-        user_id_to_unfollow = int(payload['unfollow'])
+        insert_unfollow(payload)
 
-        if any([id_ not in app.users for id_ in [user_id, user_id_to_unfollow]]):
-            return '사용자가 존재하지 않습니다.', 400
-
-        user = app.users[user_id]
-        user.setdefault('follow', set()).discard(user_id_to_unfollow)
-
-        return jsonify(user)
+        return '', 200
 
     @app.route("/timeline/<int:user_id>", methods=['GET'])
     def timeline(user_id):
-        if user_id not in app.users:
-            return '사용자가 존재하지 않습니다.', 400
-
-        follow_list = app.users[user_id].get('follow', set())
-        follow_list.add(user_id)
-        timeline = [tweet for tweet in app.tweets if tweet['user_id'] in follow_list]
-
         return jsonify({
             'user_id': user_id,
-            'timeline': timeline
+            'timeline': get_timeline(user_id)
         })
 
     return app
