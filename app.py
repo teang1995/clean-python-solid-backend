@@ -1,8 +1,8 @@
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, current_app
+from flask import Flask
 from flask.json import JSONEncoder
-from secrets import db_username, db_password, db_host, db_port, db_database
+from .secrets import db_username, db_password, db_host, db_port, db_database
 from sqlalchemy import create_engine, text
-
 
 db = {
     'username': db_username,
@@ -17,62 +17,71 @@ class CustomJSONEncoder(JSONEncoder):
     def default(self, obj):
         if isinstance(obj, set):
             return list(obj)
-        
+
         return JSONEncoder.default(self, obj)
 
 
-def create_app():
-    print("__name__:", __name__)
-    app = Flask(__name__)
-
-    app.json_encoder = CustomJSONEncoder
-
-    db_url = f"mysql+mysqlconnector://{db_username}:{db_password}@" \
-             f"{db_host}:{db_port}/{db_database}?charset=utf8"
-    db = create_engine(db_url, encoding='utf-8', max_overflow=0)
-    app.database = db
-
-    @app.route("/ping", methods=['GET'])
-    def ping():
-        return "pongggg"
-
-    @app.route("/sign-up", methods=['POST'])
-    def sign_up():
-        new_user = request.json
-        new_user_id = app.database.execute(text("""
-            INSERT INTO users (
-            name,
-            email,
-            profile,
-            hashed_password
-            ) VALUES (
-            :name,
-            :email,
-            :profile,
-            :password
-            )
-        """), new_user).lastrowid
-
-        row = current_app.database.execute(text("""
+def get_user(user_id):
+    user = current_app.database.execute(text("""
             SELECT
                 id,
                 name,
                 email,
                 profile
             FROM users
-            WHERE id =: user_id
+            WHERE id = :user_id
         """), {
-            'user_id' : new_user_id
-        }).fetchone()
+        'user_id': user_id
+    }).fetchone()
 
-        created_user = {
-            'id': row['id'],
-            'name': row['name'],
-            'email': row['email'],
-            'profile': row['profile']
-        } if row else None
+    return {
+        'id': user['id'],
+        'name': user['name'],
+        'email': user['email'],
+        'profile': user['profile']
+    } if user else None
 
-        return created_user
+
+def insert_user(user):
+    return current_app.database.execute(text("""
+                INSERT INTO users (
+                name,
+                email,
+                profile,
+                hashed_password
+                ) VALUES (
+                :name,
+                :email,
+                :profile,
+                :password
+                )
+            """), user).lastrowid
+
+
+def create_app():
+    app = Flask(__name__)
+    app.debug = True
+    app.json_encoder = CustomJSONEncoder
+
+    db_url = f"mysql+mysqlconnector://{db['username']}:{db['password']}@" \
+             f"{db['host']}:{db['port']}/{db['database']}?charset=utf8"
+    database = create_engine(db_url, encoding='utf-8', max_overflow=0)
+    app.database = database
+
+    @app.route("/ping", methods=['GET'])
+    def ping():
+        return "ponggggsss"
+
+    @app.route("/sign-up", methods=['POST', 'GET'])
+    def sign_up():
+        print("dasfadsf")
+        if request.method == 'GET':
+            return "pdsfasd"
+        else:
+            new_user = request.json
+            new_user_id = insert_user(new_user)
+            new_user = get_user(new_user_id)
+            return jsonify(new_user)
 
     @app.route("/tweet", methods=['POST'])
     def tweet():
@@ -87,8 +96,8 @@ def create_app():
             return '300자를 초과한 tweet', 400
 
         tweet_dict = {
-            'user_id' : user_id,
-            'tweet' : tweet
+            'user_id': user_id,
+            'tweet': tweet
         }
         app.tweets.append(tweet_dict)
         return 'tweet success', 200
@@ -111,7 +120,6 @@ def create_app():
         이를 해결하기 위해 custom json encoder를 구현해야 한다. -> 위에 CustomJSONEncoder class 참고
         '''
         return jsonify(user)
-
 
     @app.route("/unfollow", methods=['POST'])
     def unfollow():
@@ -137,9 +145,8 @@ def create_app():
         timeline = [tweet for tweet in app.tweets if tweet['user_id'] in follow_list]
 
         return jsonify({
-            'user_id' : user_id,
-            'timeline' : timeline
+            'user_id': user_id,
+            'timeline': timeline
         })
 
     return app
-

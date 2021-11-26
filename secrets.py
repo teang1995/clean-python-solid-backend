@@ -1,7 +1,9 @@
 from dotenv import load_dotenv
 import os
+from os.path import join, dirname
 
-load_dotenv()
+dotenv_path = join(dirname(__file__), '.env')
+load_dotenv(dotenv_path)
 
 db_username = os.getenv('DB_USERNAME')
 db_password = os.getenv('DB_PASSWORD')
