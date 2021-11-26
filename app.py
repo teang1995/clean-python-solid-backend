@@ -3,12 +3,13 @@ from flask.json import JSONEncoder
 from secrets import db_username, db_password, db_host, db_port, db_database
 from sqlalchemy import create_engine, text
 
+
 db = {
-    'username' : db_username,
-    'password' : db_password,
-    'host' : db_host,
-    'port' : db_port,
-    'database' : db_database
+    'username': db_username,
+    'password': db_password,
+    'host': db_host,
+    'port': db_port,
+    'database': db_database
 }
 
 
@@ -20,11 +21,10 @@ class CustomJSONEncoder(JSONEncoder):
         return JSONEncoder.default(self, obj)
 
 
-
-
 def create_app():
+    print("__name__:", __name__)
     app = Flask(__name__)
-    print('__name__')
+
     app.json_encoder = CustomJSONEncoder
 
     db_url = f"mysql+mysqlconnector://{db_username}:{db_password}@" \
@@ -126,7 +126,6 @@ def create_app():
         user.setdefault('follow', set()).discard(user_id_to_unfollow)
 
         return jsonify(user)
-
 
     @app.route("/timeline/<int:user_id>", methods=['GET'])
     def timeline(user_id):
