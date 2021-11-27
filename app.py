@@ -1,5 +1,4 @@
-from flask import Flask, jsonify, request, current_app
-from flask import Flask
+from flask import Flask, jsonify, request, current_app, Response
 from flask.json import JSONEncoder
 from .secrets import db_username, db_password, db_host, db_port, db_database, jwt_secret_key
 from sqlalchemy import create_engine, text
