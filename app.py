@@ -1,8 +1,13 @@
 from flask import Flask, jsonify, request, current_app
 from flask import Flask
 from flask.json import JSONEncoder
-from .secrets import db_username, db_password, db_host, db_port, db_database
+from .secrets import db_username, db_password, db_host, db_port, db_database, jwt_secret_key
 from sqlalchemy import create_engine, text
+
+import bcrypt
+from datetime import datetime, timedelta
+import jwt
+
 
 db = {
     'username': db_username,
@@ -125,9 +130,35 @@ def create_app():
     @app.route("/sign-up", methods=['POST', 'GET'])
     def sign_up():
         new_user = request.json
+        new_user['password'] = bcrypt.hashpw(
+            new_user['password'].encode('UTF-8'),
+            bcrypt.gensalt()
+        )
         new_user_id = insert_user(new_user)
         new_user = get_user(new_user_id)
         return jsonify(new_user)
+
+    @app.route("/login", methods=['POST'])
+    def login():
+        credential = request.json
+        email = credential['email']
+        password = credential['password']
+
+        row = database.execute(text("""
+            SELECT
+                id,
+                hashed_password
+            FROM users
+            WHERE email = :email
+        """), {'email': email}).fetchone()
+
+        if row and bcrypt.checkpw(password.encode('UTF-8'), row['hashed_password'].encode('UTF-8')):
+            user_id = row['id']
+            payload = {
+                'user_id': user_id,
+                'exp': datetime.utcnow() + timedelta(secnonds=60 * 60 * 24)
+            }
+            token = jwt.encode(payload, jwt_secret_key, 'HS256')
 
     @app.route("/tweet", methods=['POST'])
     def tweet():

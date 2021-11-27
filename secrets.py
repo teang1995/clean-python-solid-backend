@@ -10,7 +10,7 @@ db_password = os.getenv('DB_PASSWORD')
 db_host = os.getenv('DB_HOST')
 db_port = os.getenv('DB_PORT')
 db_database = os.getenv('DB_DATABASE')
-
+jwt_secret_key = os.getenv('JWT_SECRET_KEY')
 if __name__ == "__main__":
     print(db_username)
     print(db_password)
